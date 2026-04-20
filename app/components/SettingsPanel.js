@@ -6,7 +6,7 @@ import {
     Library, KeyRound, Settings, BookOpen, User, MapPin, Globe, Gem,
     ClipboardList, Ruler, Upload, Download, Trash2, X, Maximize2, Minimize2,
     FileText, Sparkles, Search, Coins, Plug, Radio, RefreshCw, CheckCircle2,
-    XCircle, AlertTriangle, Globe2, Shuffle, Eye, EyeOff, Ban, Pencil, FolderOpen,
+    XCircle, AlertTriangle, Shuffle, Eye, EyeOff, Ban, Pencil, FolderOpen,
     Bell, RotateCcw, Monitor, CircleDot, Smartphone, Clapperboard,
     Heart, Star, Shield, Zap, Feather, Compass, Flag, Tag, Layers,
     Bookmark, Crown, Flame, Lightbulb, Music, Palette, Sword, Target,
@@ -1382,22 +1382,6 @@ function PreferencesForm() {
         }
     };
 
-    const handleGoogleAuth = async () => {
-        setAuthLoading(true);
-        setAuthError('');
-        try {
-            const auth = await import('../lib/auth');
-            await auth.signInWithGoogle();
-            const { syncFromCloud } = await import('../lib/persistence');
-            const merged = await syncFromCloud();
-            if (merged > 0) window.location.reload();
-        } catch (err) {
-            setAuthError(err.message || 'Google 登录失败');
-        } finally {
-            setAuthLoading(false);
-        }
-    };
-
     const handleSignOut = async () => {
         try {
             const { stopCloudSync } = await import('../lib/persistence');
@@ -1624,31 +1608,6 @@ function PreferencesForm() {
                                     {authMode === 'login' ? '没有账号？注册' : '已有账号？登录'}
                                 </button>
                             </div>
-
-                            {/* 分隔线 */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0' }}>
-                                <div style={{ flex: 1, height: 1, background: 'var(--border-light)' }} />
-                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>或</span>
-                                <div style={{ flex: 1, height: 1, background: 'var(--border-light)' }} />
-                            </div>
-
-                            {/* Google 登录 */}
-                            <button
-                                onClick={handleGoogleAuth}
-                                disabled={authLoading}
-                                style={{
-                                    width: '100%', padding: '8px 16px', fontSize: 13, fontWeight: 500,
-                                    border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
-                                    background: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                    transition: 'all 0.15s',
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
-                                onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-primary)'}
-                            >
-                                <Globe2 size={15} /> 使用 Google 账号登录
-                            </button>
-                        </div>
                     )}
                 </div>
 

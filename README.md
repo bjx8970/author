@@ -145,7 +145,7 @@ If you insist on self-deploying via source code or Vercel and want to enable mul
 #### 1. Create a Supabase Project
 
 1. Go to [Supabase Console](https://supabase.com/) → **New project**
-2. In the project, navigate to **Authentication → Providers** and enable **Email** and **Google**
+2. In the project, navigate to **Authentication → Providers** and enable **Email**
 3. Run the following SQL in the **SQL Editor** (or run `supabase/migrations/001_create_user_data.sql`):
 
 ```sql

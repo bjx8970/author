@@ -171,7 +171,7 @@ export default function AccountModal() {
     const lastSignIn = authUser.metadata?.lastSignInTime
         ? new Date(authUser.metadata.lastSignInTime).toLocaleDateString()
         : null;
-    const providerName = authUser.providerData?.[0]?.providerId === 'google.com' ? 'Google' : '邮箱密码';
+    const providerName = authUser.providerData?.[0]?.providerId === 'google.com' ? 'Google' : t('accountModal.providerEmail') || '邮箱密码';
 
     // 其他历史账号（排除当前）
     const otherAccounts = accountHistory.filter(a => a.uid !== authUser.uid);

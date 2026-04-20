@@ -5,11 +5,10 @@ import { X, Mail, Lock, XCircle } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useI18n } from '../lib/useI18n';
 import { useAuthAction } from '../lib/useAuthAction';
-import GoogleIcon from './icons/GoogleIcon';
 
 /**
  * 独立登录弹窗（仅登录，注册入口跳转 RegisterModal）
- * 支持邮箱密码登录 + Google 登录
+ * 支持邮箱密码登录
  */
 export default function LoginModal() {
     const { showLoginModal, setShowLoginModal, setShowRegisterModal } = useAppStore();
@@ -34,11 +33,6 @@ export default function LoginModal() {
         await auth.signInWithEmail(authEmail, authPassword);
     });
 
-    const handleGoogleLogin = () => run(async () => {
-        const auth = await import('../lib/auth');
-        await auth.signInWithGoogle();
-    });
-
     const switchToRegister = () => {
         setShowLoginModal(false);
         setTimeout(() => setShowRegisterModal(true), 150);
@@ -60,7 +54,7 @@ export default function LoginModal() {
                     <p className="login-modal-desc">{t('loginModal.desc')}</p>
                 </div>
 
-                {/* 邮箱密码表单 — 放在上面 */}
+                {/* 邮箱密码表单 */}
                 <div className="login-modal-form">
                     <div className="login-modal-input-wrap">
                         <Mail size={15} className="login-modal-input-icon" />
@@ -99,18 +93,6 @@ export default function LoginModal() {
                     disabled={loading || !authEmail || !authPassword}
                 >
                     {loading ? t('loginModal.loggingIn') : t('loginModal.loginBtn')}
-                </button>
-
-                {/* 分隔线 + Google 登录 — 放在下面 */}
-                <div className="login-modal-divider"><span>{t('loginModal.or')}</span></div>
-
-                <button
-                    className="login-modal-google-btn"
-                    onClick={handleGoogleLogin}
-                    disabled={loading}
-                >
-                    <GoogleIcon />
-                    {t('loginModal.googleLogin')}
                 </button>
 
                 <div className="login-modal-switch">

@@ -145,7 +145,7 @@ npm start
 #### 1. إنشاء مشروع عبر منصة Supabase
 
 1. توجه لـ [Supabase Console](https://supabase.com/) واختر **New project**.
-2. في المشروع، افتح **Authentication → Providers** وفعّل **Email** و **Google**.
+2. في المشروع، افتح **Authentication → Providers** وفعّل **Email**.
 3. قم بتشغيل استعلام SQL التالي في **SQL Editor** (أو نفّذ `supabase/migrations/001_create_user_data.sql`):
 
 ```sql

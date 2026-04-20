@@ -147,7 +147,7 @@ npm start
 #### 1. 创建 Supabase 项目
 
 1. 前往 [Supabase 控制台](https://supabase.com/) → **New project**
-2. 进入项目后，点击左侧菜单 **Authentication → Providers**，启用 **Email** 和 **Google**
+2. 进入项目后，点击左侧菜单 **Authentication → Providers**，启用 **Email**
 3. 在 **SQL Editor** 中执行以下建表语句（或直接运行 `supabase/migrations/001_create_user_data.sql`）：
 
 ```sql

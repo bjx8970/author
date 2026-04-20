@@ -6,11 +6,10 @@ import { useAppStore } from '../store/useAppStore';
 import { useI18n } from '../lib/useI18n';
 import { useAuthAction } from '../lib/useAuthAction';
 import { legalDocUrl } from '../lib/constants';
-import GoogleIcon from './icons/GoogleIcon';
 
 /**
  * 独立注册弹窗
- * 支持邮箱密码注册 + Google 注册
+ * 支持邮箱密码注册
  */
 export default function RegisterModal() {
     const { showRegisterModal, setShowRegisterModal, setShowLoginModal } = useAppStore();
@@ -53,11 +52,6 @@ export default function RegisterModal() {
             await auth.signUpWithEmail(email, password);
         });
     };
-
-    const handleGoogleRegister = () => run(async () => {
-        const auth = await import('../lib/auth');
-        await auth.signInWithGoogle();
-    });
 
     const switchToLogin = () => {
         setShowRegisterModal(false);
@@ -150,18 +144,6 @@ export default function RegisterModal() {
                     disabled={loading || !email || !password || !confirmPassword}
                 >
                     {loading ? t('registerModal.registering') : t('registerModal.registerBtn')}
-                </button>
-
-                {/* 分隔线 + Google 注册 — 放在下面 */}
-                <div className="login-modal-divider"><span>{t('registerModal.or')}</span></div>
-
-                <button
-                    className="login-modal-google-btn"
-                    onClick={handleGoogleRegister}
-                    disabled={loading}
-                >
-                    <GoogleIcon />
-                    {t('registerModal.googleRegister')}
                 </button>
 
                 <p className="login-modal-terms">

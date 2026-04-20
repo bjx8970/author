@@ -133,19 +133,6 @@ export async function signUpWithEmail(email, password) {
     return normalizeUser(data.user);
 }
 
-// Google OAuth 登录（重定向流程）
-export async function signInWithGoogle() {
-    if (!supabase) throw new Error('Supabase 未配置');
-    const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-            redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-        },
-    });
-    if (error) throw error;
-    // OAuth 会触发页面跳转，此处不会返回用户
-}
-
 // 退出登录
 export async function signOut() {
     if (!supabase) return;
