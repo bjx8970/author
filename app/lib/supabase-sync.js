@@ -9,9 +9,10 @@ import { getCurrentUser } from './auth';
 
 // ==================== 配置 ====================
 
-const SYNC_INTERVAL = 5 * 60 * 1000; // 5 分钟
-const IDLE_TIMEOUT = 5 * 60 * 1000;  // 5 分钟无变化后停止自动同步
-const TABLE_NAME = 'user_data';       // user_data(user_id, key, value, updated_at)
+const SYNC_INTERVAL = 5 * 60 * 1000;    // 5 分钟
+const IDLE_TIMEOUT = 5 * 60 * 1000;     // 5 分钟无变化后停止自动同步
+const FIRST_SYNC_UI_DELAY = 800;        // 首次同步时给 UI 动画留出的最短展示时间（ms）
+const TABLE_NAME = 'user_data';         // user_data(user_id, key, value, updated_at)
 
 // ==================== 同步队列 ====================
 
@@ -161,7 +162,7 @@ export async function flushSync() {
         _firstSyncAfterLogin = false;
         if (_pendingWrites.size === 0 && _pendingDeletes.size === 0) {
             notifySyncStatus({ syncing: true, pending: 0 });
-            await new Promise(r => setTimeout(r, 800));
+            await new Promise(r => setTimeout(r, FIRST_SYNC_UI_DELAY));
             notifySyncStatus({ syncing: false, pending: 0, lastSync: Date.now() });
             return;
         }

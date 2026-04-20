@@ -21,7 +21,10 @@ function normalizeUser(supabaseUser) {
         displayName: meta.full_name || meta.name || null,
         photoURL: meta.avatar_url || meta.picture || null,
         providerData: [{
-            providerId: appMeta.provider === 'google' ? 'google.com' : 'password',
+            // 将 Supabase provider 名称映射为与 Firebase 兼容的 providerId 格式
+            providerId: appMeta.provider
+                ? (appMeta.provider === 'email' ? 'password' : `${appMeta.provider}.com`)
+                : 'password',
         }],
         metadata: {
             creationTime: supabaseUser.created_at,
