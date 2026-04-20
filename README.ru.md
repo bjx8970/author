@@ -88,7 +88,7 @@
 
 ## 🚀 Быстрый старт
 
-> 💡 **Настоятельно рекомендуется**: Большинству пользователей, которым нужно только ежедневное письмо и многоплатформенная облачная синхронизация, пожалуйста, [напрямую скачайте и установите клиент](https://github.com/YuanShiJiLoong/author/releases/latest). Развертывание исходного кода или Vercel рекомендуется только для продвинутых пользователей, которым требуется **вторичная разработка** или которые готовы самостоятельно настроить базу данных Firebase.
+> 💡 **Настоятельно рекомендуется**: Большинству пользователей, которым нужно только ежедневное письмо и многоплатформенная облачная синхронизация, пожалуйста, [напрямую скачайте и установите клиент](https://github.com/YuanShiJiLoong/author/releases/latest). Развертывание исходного кода или Vercel рекомендуется только для продвинутых пользователей, которым требуется **вторичная разработка** или которые готовы самостоятельно настроить базу данных Supabase.
 
 ### Требования
 - **Node.js** 18+
@@ -132,54 +132,57 @@ npm start
 
 ### Развертывание на Vercel
 
-> 💡 **⚠️ Примечание:** Версия, развернутая через Vercel, по умолчанию **не** имеет функций облачной синхронизации (вам необходимо отдельно настроить собственную ручную базу данных Firebase). Если вам нужна синхронизация на нескольких устройствах, пожалуйста, **скачайте клиент напрямую**, чтобы избежать проблем.
+> 💡 **⚠️ Примечание:** Версия, развернутая через Vercel, по умолчанию **не** имеет функций облачной синхронизации (вам необходимо отдельно настроить собственную базу данных Supabase). Если вам нужна синхронизация на нескольких устройствах, пожалуйста, **скачайте клиент напрямую**, чтобы избежать проблем.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YuanShiJiLoong/author)
 
 ### ☁️ Настройка облачной синхронизации (Self-Deploy)
 
-> 💡 **Совет:** Десктопный клиент (Windows/macOS) **имеет встроенный официальный сервер облачной синхронизации**, не требующий дополнительных настроек. Если настройка Firebase кажется утомительной, **настоятельно рекомендуется напрямую загрузить и использовать клиент**.
+> 💡 **Совет:** Десктопный клиент (Windows/macOS) **имеет встроенный официальный сервер облачной синхронизации**, не требующий дополнительных настроек. Если настройка Supabase кажется утомительной, **настоятельно рекомендуется напрямую загрузить и использовать клиент**.
 
 Если вы настаиваете на развертывании через исходный код или Vercel и хотите включить синхронизацию между устройствами, выполните следующие действия:
 
-#### 1. Создайте проект Firebase
+#### 1. Создайте проект Supabase
 
-1. Перейдите в [Firebase Console](https://console.firebase.google.com/) → **Create Project**
-2. Включите **Authentication** → Метод входа → **Google**
-3. Создайте **Firestore Database** (Начать в production mode)
-4. Установите правила безопасности (Security Rules) Firestore для ограничения доступа для каждого пользователя:
+1. Перейдите в [Supabase Console](https://supabase.com/) → **New project**
+2. В проекте откройте **Authentication → Providers** и включите **Email** и **Google**
+3. Запустите следующий SQL в **SQL Editor** (или выполните `supabase/migrations/001_create_user_data.sql`):
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
+```sql
+CREATE TABLE IF NOT EXISTS user_data (
+    user_id    UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    key        TEXT         NOT NULL,
+    value      JSONB,
+    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, key)
+);
+
+ALTER TABLE user_data ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own data"
+    ON user_data FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_data_user_id ON user_data (user_id);
 ```
 
 #### 2. Настройте переменные окружения
 
-Скопируйте `.env.example` в `.env.local` и заполните раздел Firebase:
+Скопируйте `.env.example` в `.env.local` и заполните раздел Supabase:
 
 ```bash
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-> Вы можете найти эти значения в Консоли Firebase → Настройки проекта → Общие → Ваши приложения → Конфигурация SDK.
+> Вы можете найти эти значения в Supabase Console → **Project Settings → API**.
 
 #### 3. Для развертывания Vercel
 
 Добавьте те же переменные в **Vercel Dashboard → Настройки проекта → Переменные окружения**, затем выполните повторное развертывание.
 
-> 💡 Ключи API Firebase спроектированы так, чтобы быть публичными (идентификаторы на стороне клиента). Безопасность данных обеспечивается аутентификацией Firebase + правилами безопасности Firestore, а не скрытием ключа API.
+> 💡 Ключи Supabase Anon Key публичны по замыслу (идентификаторы на стороне клиента). Безопасность данных обеспечивается Supabase Auth + политиками безопасности на уровне строк (RLS), а не скрытием ключа.
 
 ---
 
@@ -506,12 +509,12 @@ Author поддерживает импорт настроек из множес�
 
 ### 🔌 Инструменты MCP
 - [Chrome DevTools MCP](https://developer.chrome.com/) — Тестирование браузера, анализ производительности, инспекция DOM.
-- [Firebase MCP](https://firebase.google.com/) — Управление облачной БД, валидация политик безопасности, конфигурация проекта.
+- [Supabase MCP](https://supabase.com/) — Управление облачной БД, валидация политик безопасности, конфигурация проекта.
 - [GitHub MCP](https://github.com/) — Управление репозиторием, релизными версиями, поиск по коду.
 
 ### ☁️ Бэкенд и базы данных
-- [Firebase Firestore](https://firebase.google.com/docs/firestore) — Облачная синхронизация на нескольких устройствах, хранилище NoSQL-данных.
-- [Firebase Hosting / Vercel](https://vercel.com/) — Развертывание и хостинг full-stack.
+- [Supabase](https://supabase.com/) — Облачная синхронизация на нескольких устройствах, хранилище PostgreSQL, аутентификация.
+- [Vercel](https://vercel.com/) — Развертывание и хостинг full-stack.
 
 ### 📦 Фронтенд и Open Source
 - [Next.js](https://nextjs.org/) — React full-stack фреймворк.

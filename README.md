@@ -88,7 +88,7 @@ If you encounter a white screen or the app fails to start, you can check the loc
 
 ## 🚀 Getting Started
 
-> 💡 **Highly Recommended**: For most users who only need daily writing and cloud multi-device synchronization, please [directly download and install the client](https://github.com/YuanShiJiLoong/author/releases/latest). Source code deployment or Vercel deployment is only recommended for advanced users who need **secondary development** or are willing to configure a Firebase database themselves.
+> 💡 **Highly Recommended**: For most users who only need daily writing and cloud multi-device synchronization, please [directly download and install the client](https://github.com/YuanShiJiLoong/author/releases/latest). Source code deployment or Vercel deployment is only recommended for advanced users who need **secondary development** or are willing to configure a Supabase database themselves.
 
 ### Requirements
 - **Node.js** 18+
@@ -132,54 +132,57 @@ npm start
 
 ### Deploy to Vercel
 
-> 💡 **⚠️ Note:** The version deployed via Vercel does **not** have cloud sync features by default (you need to configure your own manual Firebase database separately). If you just want multi-device synchronization, please **download the client directly** to avoid the hassle.
+> 💡 **⚠️ Note:** The version deployed via Vercel does **not** have cloud sync features by default (you need to configure your own Supabase database separately). If you just want multi-device synchronization, please **download the client directly** to avoid the hassle.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YuanShiJiLoong/author)
 
 ### ☁️ Cloud Sync Setup (Self-Deploy)
 
-> 💡 **Tip:** The desktop client (Windows/macOS) **has a built-in official cloud sync server**, requiring no extra configuration to use cross-device sync. If you find configuring Firebase too tedious, **it is highly recommended to directly download and use the client**.
+> 💡 **Tip:** The desktop client (Windows/macOS) **has a built-in official cloud sync server**, requiring no extra configuration to use cross-device sync. If you find configuring Supabase too tedious, **it is highly recommended to directly download and use the client**.
 
-If you insist on self-deploying via source code or Vercel and want to enable multi-device sync, follow these steps to configure your own Firebase database:
+If you insist on self-deploying via source code or Vercel and want to enable multi-device sync, follow these steps to configure your own Supabase database:
 
-#### 1. Create a Firebase Project
+#### 1. Create a Supabase Project
 
-1. Go to [Firebase Console](https://console.firebase.google.com/) → **Create Project**
-2. Enable **Authentication** → Sign-in method → **Google**
-3. Create a **Firestore Database** (Start in production mode)
-4. Set Firestore Security Rules to restrict per-user access:
+1. Go to [Supabase Console](https://supabase.com/) → **New project**
+2. In the project, navigate to **Authentication → Providers** and enable **Email** and **Google**
+3. Run the following SQL in the **SQL Editor** (or run `supabase/migrations/001_create_user_data.sql`):
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
+```sql
+CREATE TABLE IF NOT EXISTS user_data (
+    user_id    UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    key        TEXT         NOT NULL,
+    value      JSONB,
+    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, key)
+);
+
+ALTER TABLE user_data ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own data"
+    ON user_data FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_data_user_id ON user_data (user_id);
 ```
 
 #### 2. Configure Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in the Firebase section:
+Copy `.env.example` to `.env.local` and fill in the Supabase section:
 
 ```bash
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-> You can find these values in Firebase Console → Project Settings → General → Your Apps → SDK Config.
+> You can find these values in Supabase Console → **Project Settings → API**.
 
 #### 3. For Vercel Deployment
 
 Add the same variables in **Vercel Dashboard → Project Settings → Environment Variables**, then redeploy.
 
-> 💡 Firebase API keys are designed to be public (client-side identifiers). Data security is enforced by Firebase Auth + Firestore Security Rules, not by hiding the API key.
+> 💡 Supabase Anon Keys are designed to be public (client-side identifiers). Data security is enforced by Supabase Auth + Row Level Security (RLS) policies, not by hiding the Anon Key.
 
 ---
 
@@ -511,12 +514,12 @@ By using Author, you agree to our **Privacy Policy** and **Terms of Service**. T
 
 ### 🔌 MCP Tools
 - [Chrome DevTools MCP](https://developer.chrome.com/) — Browser testing, performance analysis, DOM inspection
-- [Firebase MCP](https://firebase.google.com/) — Cloud database management, security rules validation, project config
+- [Supabase MCP](https://supabase.com/) — Cloud database management, security policy validation, project config
 - [GitHub MCP](https://github.com/) — Repository management, automated releases, code search
 
 ### ☁️ Backend & Database
-- [Firebase Firestore](https://firebase.google.com/docs/firestore) — Multi-device cloud synchronization, NoSQL data storage
-- [Firebase Hosting / Vercel](https://vercel.com/) — Full-stack deployment and hosting
+- [Supabase](https://supabase.com/) — Multi-device cloud synchronization, PostgreSQL data storage, authentication
+- [Vercel](https://vercel.com/) — Full-stack deployment and hosting
 
 ### 📦 Frontend & Open Source
 - [Next.js](https://nextjs.org/) — React full-stack framework

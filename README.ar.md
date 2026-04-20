@@ -88,7 +88,7 @@
 
 ## 🚀 دليل البدء السريع
 
-> 💡 **مُوصى به بشدة**: ننصح في الغالبية العظمى من المستخدمين الذين يريدون الكتابة اليومية فقط والمزامنة مع أجهزتهم عبر السحابة، [عبر تحميل وتثبيت برنامج الويندوز الجاهز مباشرةً](https://github.com/YuanShiJiLoong/author/releases/latest). أما التثبيت باستخدام مصدر الكود (Source Code) أو Vercel فهو موجه للمستخدمين المتقدمين الذين يودون إضافة **تطويرات جانبية (Secondary development)** والتعديل الخاص، أو تكوين قاعدة بيانات Firebase بأنفسهم.
+> 💡 **مُوصى به بشدة**: ننصح في الغالبية العظمى من المستخدمين الذين يريدون الكتابة اليومية فقط والمزامنة مع أجهزتهم عبر السحابة، [عبر تحميل وتثبيت برنامج الويندوز الجاهز مباشرةً](https://github.com/YuanShiJiLoong/author/releases/latest). أما التثبيت باستخدام مصدر الكود (Source Code) أو Vercel فهو موجه للمستخدمين المتقدمين الذين يودون إضافة **تطويرات جانبية (Secondary development)** والتعديل الخاص، أو تكوين قاعدة بيانات Supabase بأنفسهم.
 
 ### المتطلبات الأساسية
 - **Node.js** إصدار 18+
@@ -132,54 +132,57 @@ npm start
 
 ### النشر على Vercel
 
-> 💡 **⚠️ ملاحظة:** النسخة المنشورة عبر Vercel **لا تدعم ميزات المزامنة السحابية** افتراضيًا (يجب أن تقوم بتكوين قاعدة بيانات Firebase اليدوية الخاصة بك بشكل منفصل). إذا كنت تريد فقط المزامنة عبر الأجهزة، فيرجى **تنزيل تطبيق سطح المكتب مباشرةً** لتجنب العناء.
+> 💡 **⚠️ ملاحظة:** النسخة المنشورة عبر Vercel **لا تدعم ميزات المزامنة السحابية** افتراضيًا (يجب أن تقوم بتكوين قاعدة بيانات Supabase الخاصة بك بشكل منفصل). إذا كنت تريد فقط المزامنة عبر الأجهزة، فيرجى **تنزيل تطبيق سطح المكتب مباشرةً** لتجنب العناء.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YuanShiJiLoong/author)
 
 ### ☁️ إعداد المزامنة السحابية (التشغيل الذاتي Self-Deploy)
 
-> 💡 **نصيحة:** تطبيق سطح المكتب (نظام التشغيل Windows/macOS) **يحتوي على خادم مزامنة سحابية مدمج رسمي**، ولا يتطلب أي تكوين إضافي لاستخدام المزامنة عبر الأجهزة. إذا كان تكوين Firebase شاقاً للغاية بالنسبة لك، **فمن المستحسن بشدة تنزيل واستخدام التطبيق الثابت مباشرة**.
+> 💡 **نصيحة:** تطبيق سطح المكتب (نظام التشغيل Windows/macOS) **يحتوي على خادم مزامنة سحابية مدمج رسمي**، ولا يتطلب أي تكوين إضافي لاستخدام المزامنة عبر الأجهزة. إذا كان تكوين Supabase شاقاً للغاية بالنسبة لك، **فمن المستحسن بشدة تنزيل واستخدام التطبيق الثابت مباشرة**.
 
-إذا كنت تصر على النشر الذاتي للبرنامج عبر رمز المصدر (Source Code) أو Vercel وترغب في تمكين المزامنة عبر أجهزة متعددة، فاتبع هذه الخطوات لتكوين قاعدة بيانات Firebase الخاصة بك:
+إذا كنت تصر على النشر الذاتي للبرنامج عبر رمز المصدر (Source Code) أو Vercel وترغب في تمكين المزامنة عبر أجهزة متعددة، فاتبع هذه الخطوات لتكوين قاعدة بيانات Supabase الخاصة بك:
 
-#### 1. إنشاء مشروع عبر منصة Firebase
+#### 1. إنشاء مشروع عبر منصة Supabase
 
-1. توجه لـ [Firebase Console](https://console.firebase.google.com/) واختر **Create Project**.
-2. فُعل التوثيق **Authentication** لكي يتم تسجيل الدخول من خلال طريقة الدخول ← **Google**.
-3. قم بإنشاء قاعدة بيانات **Firestore Database** وحدد وضع الإنتاج (Start in production mode) كخيار.
-4. قم بتعيين قوانين الأمان (Firestore Security Rules) لتقييد وصول كل مستخدم وحمايته:
+1. توجه لـ [Supabase Console](https://supabase.com/) واختر **New project**.
+2. في المشروع، افتح **Authentication → Providers** وفعّل **Email** و **Google**.
+3. قم بتشغيل استعلام SQL التالي في **SQL Editor** (أو نفّذ `supabase/migrations/001_create_user_data.sql`):
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
+```sql
+CREATE TABLE IF NOT EXISTS user_data (
+    user_id    UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    key        TEXT         NOT NULL,
+    value      JSONB,
+    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, key)
+);
+
+ALTER TABLE user_data ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own data"
+    ON user_data FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_data_user_id ON user_data (user_id);
 ```
 
 #### 2. تعديل متغيرات البيئة (Environment Variables)
 
-انسخ `.env.example` إلى `.env.local` واملأ قسم Firebase:
+انسخ `.env.example` إلى `.env.local` واملأ قسم Supabase:
 
 ```bash
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-> تستطيع الحصول على هذه الموارد والبيانات بقائمة المشروع داخل Firebase ← الإعدادات العامة ← تطبيقاتك ← إعداد المواصفات (SDK Config).
+> تستطيع الحصول على هذه القيم من Supabase Console ← **Project Settings ← API**.
 
 #### 3. إعداد النشر الخاص بـ Vercel
 
 أضف هذه المتغيرات نفسها إلى **لوحة معلومات Vercel ← إعدادات المشروع ← متغيرات البيئة (Environment Variables)**، ثم قم بإعادة النشر (Redeploy).
 
-> 💡 تم تصميم مفاتيح الـ API الخاصة إلى Firebase لتكون عامة (معرفات من جانب العميل). يتم فرض أمان البيانات من قبل منصة توثيق مصادقة Firebase Auth + وقواعد أمان متجر قاعدة البيانات Firestore Security Rules، وليس عن طريق حجب أو إخفاء مفتاح الـ API نفسه.
+> 💡 تم تصميم مفتاح Supabase Anon Key ليكون عامًا (معرّف من جانب العميل). يتم فرض أمان البيانات عبر Supabase Auth + سياسات الأمان على مستوى الصف (RLS)، وليس عن طريق إخفاء المفتاح.
 
 ---
 
@@ -511,12 +514,12 @@ pm2 restart author
 
 ### 🔌 أدوات ربط بروتوكول السياق للنماذج والمتحكمات الإرشادية (MCP Tools)
 - [Chrome DevTools MCP](https://developer.chrome.com/) — المُختص باختبار المتصفح للبيئات، مراقية أداء العمليات (performance analysis)، واستبطان وتحليل هيكل المُتصفحات والـ DOM
-- [Firebase MCP](https://firebase.google.com/) — أداة الإدارة والتبوية لمتجهات المخدمات و الخوادم والدياتابيس المشبوكة بالسحابة المركزية، ترحيل وتأكيد وفحص لوائح سلامة وأمن القواعد، استنتاج أطواق ومقومات المشروع
+- [Supabase MCP](https://supabase.com/) — أداة الإدارة والتبوية لقواعد البيانات السحابية، ترحيل وتأكيد وفحص لوائح سلامة وأمن القواعد، استنتاج أطواق ومقومات المشروع
 - [GitHub MCP](https://github.com/) — محراث لمخازن ومستودعات البيانات، التولية والتوجيه لآليات ونظم الحزم والتعهد بالإصدارات وإحلال الحُزم البرمجية المؤتمتة التلقائية النشر الآلي، وكذا مجسات لاستقصاء والكشف الاستعلامي عبر نِطاقات الكود البحثية
 
 ### ☁️ خوادم الما-وراء (الخلفية) وقواعد التخزين المعرفي للبنية الأساسية (Backend & Database)
-- [Firebase Firestore](https://firebase.google.com/docs/firestore) — المُحرك الناهض بالتزامن السحابي عبر شتى وتعدد الأجهزة (Multi-device cloud synchronization)، والتخزين الكلي والجامع لمقاصد وملاذ البيانات المعجمية والتسجيلية الـ NoSQL
-- [Firebase Hosting / Vercel](https://vercel.com/) — التثبيتات والتوزيعات والحزم المنصوبة والمنشورة وحاضنة وتوفير مساحة لخدمة الاستضافة الـ Full-stack
+- [Supabase](https://supabase.com/) — المُحرك الناهض بالتزامن السحابي عبر شتى وتعدد الأجهزة (Multi-device cloud synchronization)، والتخزين الكلي على قاعدة بيانات PostgreSQL، والتوثيق والمصادقة
+- [Vercel](https://vercel.com/) — التثبيتات والتوزيعات والحزم المنصوبة والمنشورة وحاضنة وتوفير مساحة لخدمة الاستضافة الـ Full-stack
 
 ### 📦 الواجهة الأمامية و إشراقة التقنيات مفتوحة الأفق والمصادر (Frontend & Open Source)
 - [Next.js](https://nextjs.org/) — إطار تفاعلي مبني بلغة ومحرك ومُنظم الـ React لإنشاء واجهة ذات طبيعة الـ Full-stack

@@ -90,7 +90,7 @@
 
 ## 🚀 快速开始
 
-> 💡 **强烈建议**：对于只需满足日常写作和云端多设备同步需求的大多数用户，请[直接下载安装客户端](https://github.com/YuanShiJiLoong/author/releases/latest)使用。源码部署或 Vercel 部署仅建议需要进行**二次开发**，或愿意自行配置 Firebase 数据库的高级用户使用。
+> 💡 **强烈建议**：对于只需满足日常写作和云端多设备同步需求的大多数用户，请[直接下载安装客户端](https://github.com/YuanShiJiLoong/author/releases/latest)使用。源码部署或 Vercel 部署仅建议需要进行**二次开发**，或愿意自行配置 Supabase 数据库的高级用户使用。
 
 ### 环境要求
 - **Node.js** 18+
@@ -134,54 +134,57 @@ npm start
 
 ### 部署到 Vercel
 
-> 💡 **⚠️ 注意：** 通过 Vercel 部署的版本默认**没有**云同步等功能（需要单独配置你自己的 Firebase 数据库）。如果你只想要多设备同步，请**直接下载客户端**，无需折腾。
+> 💡 **⚠️ 注意：** 通过 Vercel 部署的版本默认**没有**云同步等功能（需要单独配置你自己的 Supabase 数据库）。如果你只想要多设备同步，请**直接下载客户端**，无需折腾。
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YuanShiJiLoong/author)
 
 ### ☁️ 云同步配置（自部署用户）
 
-> 💡 **提示：** 桌面客户端（Windows/macOS）**已内置官方云同步服务器**，无需任何额外配置即可直接使用跨端同步。如果你觉得配置 Firebase 过于繁琐，**强烈建议直接下载客户端使用**。
+> 💡 **提示：** 桌面客户端（Windows/macOS）**已内置官方云同步服务器**，无需任何额外配置即可直接使用跨端同步。如果你觉得配置 Supabase 过于繁琐，**强烈建议直接下载客户端使用**。
 
-如果你坚持通过源码或 Vercel 自部署，并希望开启多端同步，需按照以下步骤配置你自己的 Firebase 数据库：
+如果你坚持通过源码或 Vercel 自部署，并希望开启多端同步，需按照以下步骤配置你自己的 Supabase 数据库：
 
-#### 1. 创建 Firebase 项目
+#### 1. 创建 Supabase 项目
 
-1. 前往 [Firebase 控制台](https://console.firebase.google.com/) → **创建项目**
-2. 启用 **Authentication** → 登录方式 → **Google**
-3. 创建 **Firestore Database**（生产模式）
-4. 设置 Firestore 安全规则，限制每个用户只能访问自己的数据：
+1. 前往 [Supabase 控制台](https://supabase.com/) → **New project**
+2. 进入项目后，点击左侧菜单 **Authentication → Providers**，启用 **Email** 和 **Google**
+3. 在 **SQL Editor** 中执行以下建表语句（或直接运行 `supabase/migrations/001_create_user_data.sql`）：
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
+```sql
+CREATE TABLE IF NOT EXISTS user_data (
+    user_id    UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    key        TEXT         NOT NULL,
+    value      JSONB,
+    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, key)
+);
+
+ALTER TABLE user_data ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own data"
+    ON user_data FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_data_user_id ON user_data (user_id);
 ```
 
 #### 2. 配置环境变量
 
-将 `.env.example` 复制为 `.env.local`，填入 Firebase 配置：
+将 `.env.example` 复制为 `.env.local`，填入 Supabase 配置：
 
 ```bash
-NEXT_PUBLIC_FIREBASE_API_KEY=你的_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=你的项目.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=你的项目ID
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=你的项目.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=你的sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=你的app_id
+NEXT_PUBLIC_SUPABASE_URL=https://你的项目ID.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=你的_anon_key
 ```
 
-> 这些值可在 Firebase 控制台 → 项目设置 → 常规 → 你的应用 → SDK 配置 中找到。
+> 这些值可在 Supabase 控制台 → **Project Settings → API** 中找到。
 
 #### 3. Vercel 部署
 
 在 **Vercel 控制面板 → 项目设置 → Environment Variables** 中添加相同的变量，然后重新部署。
 
-> 💡 Firebase API Key 设计上就是公开的（客户端标识符）。数据安全由 Firebase Auth + Firestore 安全规则保障，而非隐藏 API Key。
+> 💡 Supabase Anon Key 设计上就是公开的（客户端标识符）。数据安全由 Supabase Auth + 行级安全（RLS）策略保障，而非隐藏 Anon Key。
 
 ---
 
@@ -584,12 +587,12 @@ Author 支持从多种格式导入设定集：**JSON / Markdown / TXT / DOCX / P
 
 ### 🔌 MCP 工具
 - [Chrome DevTools MCP](https://developer.chrome.com/) — 浏览器测试、性能分析、DOM 检查
-- [Firebase MCP](https://firebase.google.com/) — 云数据库管理、安全规则验证、项目配置
+- [Supabase MCP](https://supabase.com/) — 云数据库管理、安全规则验证、项目配置
 - [GitHub MCP](https://github.com/) — 仓库管理、自动化发版、代码搜索
 
 ### ☁️ 后端与数据库
-- [Firebase Firestore](https://firebase.google.com/docs/firestore) — 多端云同步、NoSQL 数据存储
-- [Firebase Hosting / Vercel](https://vercel.com/) — 全栈服务端托管
+- [Supabase](https://supabase.com/) — 多端云同步、PostgreSQL 数据存储、身份认证
+- [Vercel](https://vercel.com/) — 全栈服务端托管
 
 ### 📦 前端与开源组件
 - [Next.js](https://nextjs.org/) — React 全栈框架
