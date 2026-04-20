@@ -1344,18 +1344,18 @@ function PreferencesForm() {
     const [firebaseAvailable, setFirebaseAvailable] = useState(false);
 
     useEffect(() => {
-        // 动态加载 Firebase 模块（避免未配置时报错）
+        // 动态加载 Supabase 模块（避免未配置时报错）
         (async () => {
             try {
-                const { isFirebaseConfigured } = await import('../lib/firebase');
-                if (!isFirebaseConfigured) return;
+                const { isSupabaseConfigured } = await import('../lib/supabase');
+                if (!isSupabaseConfigured) return;
                 setFirebaseAvailable(true);
                 const { onAuthChange, initAuth } = await import('../lib/auth');
-                const { onSyncStatusChange } = await import('../lib/firestore-sync');
+                const { onSyncStatusChange } = await import('../lib/supabase-sync');
                 initAuth();
                 onAuthChange(user => setAuthUser(user));
                 onSyncStatusChange(status => setSyncStatus(status));
-            } catch { /* Firebase 未配置，忽略 */ }
+            } catch { /* Supabase 未配置，忽略 */ }
         })();
     }, []);
 

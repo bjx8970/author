@@ -1,28 +1,25 @@
 'use client';
 
-// ==================== Firestore 同步层 ====================
+// ==================== Supabase 同步层 ====================
 // 本地优先 + 云端智能同步
 // 数据变化时启动同步，5分钟无变化后停止定时器，直到下次变化
 
-import {
-    doc, getDoc, setDoc, deleteDoc, serverTimestamp, writeBatch,
-} from 'firebase/firestore';
-import { db, isFirebaseConfigured } from './firebase';
+import { supabase, isSupabaseConfigured } from './supabase';
 import { getCurrentUser } from './auth';
 
 // ==================== 配置 ====================
 
 const SYNC_INTERVAL = 5 * 60 * 1000; // 5 分钟
 const IDLE_TIMEOUT = 5 * 60 * 1000;  // 5 分钟无变化后停止自动同步
-const COLLECTION_NAME = 'data';       // users/{uid}/data/{key}
+const TABLE_NAME = 'user_data';       // user_data(user_id, key, value, updated_at)
 
 // ==================== 同步队列 ====================
 
 const _pendingWrites = new Map();    // key → { value, timestamp }
+const _pendingDeletes = new Set();   // 待删除的 key 集合
 let _syncTimer = null;
 let _isSyncing = false;
 let _idleTimer = null;               // 空闲检测定时器
-let _lastDataChange = 0;             // 最后一次数据变化时间
 let _firstSyncAfterLogin = true;     // 登录后第一次同步标志（强制真实同步）
 
 // 同步状态回调
@@ -35,7 +32,7 @@ function notifySyncStatus(status) {
     if (_syncStatusCallback) {
         _syncStatusCallback({
             ...status,
-            keys: Array.from(_pendingWrites.keys())
+            keys: Array.from(_pendingWrites.keys()),
         });
     }
 }
@@ -43,39 +40,45 @@ function notifySyncStatus(status) {
 // ==================== 读写接口 ====================
 
 /**
- * 从 Firestore 读取数据
+ * 从 Supabase 读取数据
  * @param {string} key - 存储键名
  * @returns {Promise<any>} 数据值，不存在返回 undefined
  */
-export async function firestoreGet(key) {
+export async function supabaseGet(key) {
     const user = getCurrentUser();
-    if (!isFirebaseConfigured || !db || !user) return undefined;
+    if (!isSupabaseConfigured || !supabase || !user) return undefined;
 
     try {
-        const ref = doc(db, 'users', user.uid, COLLECTION_NAME, key);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-            return snap.data().value;
+        const { data, error } = await supabase
+            .from(TABLE_NAME)
+            .select('value')
+            .eq('user_id', user.uid)
+            .eq('key', key)
+            .single();
+
+        if (error) {
+            // PGRST116 = 未找到行，属于正常情况
+            if (error.code === 'PGRST116') return undefined;
+            throw error;
         }
-        return undefined;
+        return data?.value;
     } catch (err) {
-        console.warn('[firestore] GET failed:', key, err.message);
+        console.warn('[supabase-sync] GET failed:', key, err.message);
         return undefined;
     }
 }
 
 /**
- * 将数据加入同步队列（不立即写入 Firestore）
+ * 将数据加入同步队列（不立即写入 Supabase）
  * 同时启动/重置空闲检测定时器
  * @param {string} key - 存储键名
  * @param {any} value - 要存储的值
  */
-export function firestoreEnqueue(key, value) {
+export function supabaseEnqueue(key, value) {
     const user = getCurrentUser();
-    if (!isFirebaseConfigured || !db || !user) return;
+    if (!isSupabaseConfigured || !supabase || !user) return;
 
     _pendingWrites.set(key, { value, timestamp: Date.now() });
-    _lastDataChange = Date.now();
     notifySyncStatus({ pending: _pendingWrites.size });
 
     // 启动定时同步（如果还没启动）
@@ -86,12 +89,28 @@ export function firestoreEnqueue(key, value) {
 }
 
 /**
+ * 将数据加入删除队列
+ * @param {string} key - 存储键名
+ */
+export function supabaseDel(key) {
+    const user = getCurrentUser();
+    if (!isSupabaseConfigured || !supabase || !user) return;
+
+    // 写队列中若有该 key 先移除
+    _pendingWrites.delete(key);
+    _pendingDeletes.add(key);
+
+    ensureSyncTimer();
+    resetIdleTimer();
+}
+
+/**
  * 启动同步定时器（如果未运行）
  */
 function ensureSyncTimer() {
     if (!_syncTimer) {
         _syncTimer = setInterval(flushSync, SYNC_INTERVAL);
-        console.log('[firestore] sync timer started');
+        console.log('[supabase-sync] sync timer started');
     }
 }
 
@@ -102,7 +121,7 @@ function clearSyncTimer() {
     if (_syncTimer) {
         clearInterval(_syncTimer);
         _syncTimer = null;
-        console.log('[firestore] sync timer stopped (idle)');
+        console.log('[supabase-sync] sync timer stopped (idle)');
     }
 }
 
@@ -122,52 +141,31 @@ function resetIdleTimer() {
                 lastSync: Date.now(),
                 idle: true,
             });
-            console.log('[firestore] auto-sync paused: no data changes for 5 minutes');
+            console.log('[supabase-sync] auto-sync paused: no data changes for 5 minutes');
         });
     }, IDLE_TIMEOUT);
-}
-
-/**
- * 立即从 Firestore 删除数据
- * @param {string} key - 存储键名
- */
-export async function firestoreDel(key) {
-    const user = getCurrentUser();
-    if (!isFirebaseConfigured || !db || !user) return;
-
-    // 不再立即删除，而是加入延迟队列中，跟普通的写入保持同一步调
-    _pendingWrites.set(key, { value: '_AUTHOR_DELETE_' });
-
-    // 每次发生写操作，都会重置空闲定时器
-    if (!_isSyncing && !_syncTimer) {
-        startSyncTimer();
-    }
-    resetIdleTimer();
 }
 
 // ==================== 批量同步 ====================
 
 /**
- * 将队列中的数据批量写入 Firestore
+ * 将队列中的数据批量写入 Supabase
  * 由定时器自动调用，也可手动调用（如退出登录前）
  */
 export async function flushSync() {
     const user = getCurrentUser();
-    if (!isFirebaseConfigured || !db || !user) return;
+    if (!isSupabaseConfigured || !supabase || !user) return;
 
     // 登录后第一次同步 — 强制执行真实同步（即使队列为空）
     if (_firstSyncAfterLogin) {
         _firstSyncAfterLogin = false;
-        if (_pendingWrites.size === 0) {
-            // 队列为空但是首次 → 标记为正在同步，给 UI 反馈
+        if (_pendingWrites.size === 0 && _pendingDeletes.size === 0) {
             notifySyncStatus({ syncing: true, pending: 0 });
-            // 短暂延迟让 UI 看到同步动画
             await new Promise(r => setTimeout(r, 800));
             notifySyncStatus({ syncing: false, pending: 0, lastSync: Date.now() });
             return;
         }
-    } else if (_pendingWrites.size === 0) {
-        // 非首次且无待同步数据 — 仅反馈 UI
+    } else if (_pendingWrites.size === 0 && _pendingDeletes.size === 0) {
         notifySyncStatus({ syncing: false, pending: 0, lastSync: Date.now() });
         return;
     }
@@ -177,72 +175,64 @@ export async function flushSync() {
     notifySyncStatus({ syncing: true, pending: _pendingWrites.size });
 
     // 取出当前队列快照
-    const entries = Array.from(_pendingWrites.entries());
+    const writeEntries = Array.from(_pendingWrites.entries());
+    const deleteKeys = Array.from(_pendingDeletes);
     _pendingWrites.clear();
+    _pendingDeletes.clear();
 
     try {
-        // Firestore 限制：每个 writeBatch 最多 500 个操作
-        const BATCH_LIMIT = 450;
-        for (let i = 0; i < entries.length; i += BATCH_LIMIT) {
-            const chunk = entries.slice(i, i + BATCH_LIMIT);
-            const batch = writeBatch(db);
-
-            for (const [key, { value }] of chunk) {
-                const ref = doc(db, 'users', user.uid, COLLECTION_NAME, key);
-                
-                if (value === '_AUTHOR_DELETE_') {
-                    try {
-                        batch.delete(ref);
-                    } catch (batchErr) {
-                        console.error('[firestore] batch.delete failed for key:', key);
-                        throw batchErr;
-                    }
-                    continue;
+        // 批量写入（upsert）
+        if (writeEntries.length > 0) {
+            const deepClean = (obj) => {
+                if (obj === undefined) return null;
+                if (obj === null || typeof obj !== 'object') return obj;
+                if (Array.isArray(obj)) return obj.map(deepClean);
+                const cleanObj = {};
+                for (const k in obj) {
+                    const v = deepClean(obj[k]);
+                    if (v !== undefined) cleanObj[k] = v;
                 }
+                return cleanObj;
+            };
 
-                // 深度剔除，防止任何边角情况
-                const deepClean = (obj) => {
-                    if (obj === undefined) return null;
-                    if (obj === null || typeof obj !== 'object') return obj;
-                    if (Array.isArray(obj)) return obj.map(deepClean);
-                    const cleanObj = {};
-                    for (const k in obj) {
-                        const v = deepClean(obj[k]);
-                        if (v !== undefined) cleanObj[k] = v;
-                    }
-                    return cleanObj;
-                };
+            const rows = writeEntries.map(([key, { value }]) => ({
+                user_id: user.uid,
+                key,
+                value: deepClean(value),
+                updated_at: new Date().toISOString(),
+            }));
 
-                const cleanValue = deepClean(value);
-                
-                const payload = {
-                    value: cleanValue,
-                    updatedAt: serverTimestamp(),
-                };
+            const { error: upsertError } = await supabase
+                .from(TABLE_NAME)
+                .upsert(rows, { onConflict: 'user_id,key' });
 
-                try {
-                    batch.set(ref, payload);
-                } catch (batchErr) {
-                    console.error('[firestore] batch.set failed for key:', key);
-                    console.error('[firestore] payload:', JSON.stringify(payload, null, 2));
-                    console.error('[firestore] updatedAt type:', typeof payload.updatedAt);
-                    console.error('[firestore] is serverTimestamp undefined?', serverTimestamp() === undefined);
-                    throw batchErr;
-                }
-            }
-
-            await batch.commit();
+            if (upsertError) throw upsertError;
         }
 
-        console.log(`[firestore] synced ${entries.length} items`);
+        // 批量删除
+        if (deleteKeys.length > 0) {
+            const { error: deleteError } = await supabase
+                .from(TABLE_NAME)
+                .delete()
+                .eq('user_id', user.uid)
+                .in('key', deleteKeys);
+
+            if (deleteError) throw deleteError;
+        }
+
+        const total = writeEntries.length + deleteKeys.length;
+        console.log(`[supabase-sync] synced ${total} items`);
         notifySyncStatus({ syncing: false, pending: 0, lastSync: Date.now() });
     } catch (err) {
-        console.error('[firestore] batch sync failed:', err.message);
+        console.error('[supabase-sync] batch sync failed:', err.message);
         // 失败的写回队列，等下次重试
-        for (const [key, data] of entries) {
+        for (const [key, data] of writeEntries) {
             if (!_pendingWrites.has(key)) {
                 _pendingWrites.set(key, data);
             }
+        }
+        for (const key of deleteKeys) {
+            _pendingDeletes.add(key);
         }
         notifySyncStatus({ syncing: false, pending: _pendingWrites.size, error: err.message });
     } finally {
@@ -251,51 +241,50 @@ export async function flushSync() {
 }
 
 /**
- * 首次登录时，从 Firestore 拉取全部数据并合并到本地
+ * 首次登录时，从 Supabase 拉取全部数据并合并到本地
  * @param {Function} localGet - 本地读取函数 (key) => value
  * @param {Function} localSet - 本地写入函数 (key, value) => void
  * @returns {Promise<number>} 合并的数据条数
  */
 export async function pullAllFromCloud(localGet, localSet) {
     const user = getCurrentUser();
-    if (!isFirebaseConfigured || !db || !user) return 0;
+    if (!isSupabaseConfigured || !supabase || !user) return 0;
 
     try {
-        const { collection, getDocs } = await import('firebase/firestore');
-        const colRef = collection(db, 'users', user.uid, COLLECTION_NAME);
-        const snapshot = await getDocs(colRef);
+        const { data: rows, error } = await supabase
+            .from(TABLE_NAME)
+            .select('key, value, updated_at')
+            .eq('user_id', user.uid);
+
+        if (error) throw error;
+        if (!rows || rows.length === 0) return 0;
 
         let merged = 0;
-        for (const docSnap of snapshot.docs) {
-            const key = docSnap.id;
-            const cloudData = docSnap.data();
+        for (const row of rows) {
+            const key = row.key;
+            const cloudValue = row.value;
             const localData = await localGet(key);
 
-            // 判断本地数据是否实质上为空或仅包含初始默认结构
             const isLocalEmptyOrDefault = (key, data) => {
                 if (data === undefined || data === null) return true;
                 if (Array.isArray(data)) {
                     if (data.length === 0) return true;
                     if (key.startsWith('author-chapters')) {
-                        // 初始项目可能会自动生成“第一卷”和“未命名章节”
-                        // 只要没有任何章节有实际内容，就认为是空状态
-                        const hasContent = data.some(item => 
-                            item.type !== 'volume' && 
+                        const hasContent = data.some(item =>
+                            item.type !== 'volume' &&
                             ((item.content && item.content.trim() !== '') || (item.wordCount > 0) || (item.title && item.title !== '未命名章节'))
                         );
                         return !hasContent;
                     }
                     if (key.startsWith('author-settings-nodes')) {
-                        // 初始设定的文件夹不包含任何实质 item，且作品信息（special）也为空
                         const hasItems = data.some(item => item.type === 'item');
-                        const hasSpecialContent = data.some(node => 
-                            node.type === 'special' && 
+                        const hasSpecialContent = data.some(node =>
+                            node.type === 'special' &&
                             (node.content?.title || node.content?.synopsis)
                         );
                         return !hasItems && !hasSpecialContent;
                     }
                     if (key === 'author-works-index') {
-                        // 只有一个默认的书籍，说明是全新初始化
                         if (data.length === 1 && data[0].id === 'work-default' && data[0].name === '默认作品') {
                             return true;
                         }
@@ -309,13 +298,10 @@ export async function pullAllFromCloud(localGet, localSet) {
                 return false;
             };
 
-            // 简单合并策略：如果本地确实没有实质数据，则用云端的覆盖
-            // 解决新设备登录时，由于本地存在默认初始化的空章节/设定导致无法拉取云端数据的问题
             if (isLocalEmptyOrDefault(key, localData)) {
-                await localSet(key, cloudData.value);
+                await localSet(key, cloudValue);
                 merged++;
-            } else if (Array.isArray(localData) && Array.isArray(cloudData.value)) {
-                // 基于 id 和 updatedAt 的智能合并
+            } else if (Array.isArray(localData) && Array.isArray(cloudValue)) {
                 let isIdBased = false;
                 const localMap = new Map();
                 for (const item of localData) {
@@ -324,10 +310,10 @@ export async function pullAllFromCloud(localGet, localSet) {
                         localMap.set(item.id, { ...item });
                     }
                 }
-                
+
                 if (isIdBased) {
                     let hasDeltas = false;
-                    for (const item of cloudData.value) {
+                    for (const item of cloudValue) {
                         if (item && item.id) {
                             const localItem = localMap.get(item.id);
                             if (!localItem) {
@@ -348,69 +334,68 @@ export async function pullAllFromCloud(localGet, localSet) {
                         merged++;
                     }
                 }
-            } else if (cloudData.updatedAt) {
-                // 原有逻辑保持（尽力而为）
             }
         }
 
-        console.log(`[firestore] pulled ${snapshot.size} items, merged ${merged}`);
+        console.log(`[supabase-sync] pulled ${rows.length} items, merged ${merged}`);
         return merged;
     } catch (err) {
-        console.warn('[firestore] pull failed:', err.message);
+        console.warn('[supabase-sync] pull failed:', err.message);
         return 0;
     }
 }
 
 /**
  * 强制从云端拉取全部数据，无视本地状态直接覆盖
- * 用户手动点击“从云端同步”时调用
+ * 用户手动点击"从云端同步"时调用
  * @param {Function} localSet - 本地写入函数 (key, value) => void或Promise
  * @returns {Promise<number>} 覆盖的数据条数
  */
 export async function forcePullFromCloud(localSet) {
     const user = getCurrentUser();
-    if (!isFirebaseConfigured || !db || !user) return 0;
+    if (!isSupabaseConfigured || !supabase || !user) return 0;
 
     notifySyncStatus({ syncing: true, pending: 0 });
     try {
-        const { collection, getDocs } = await import('firebase/firestore');
-        const colRef = collection(db, 'users', user.uid, COLLECTION_NAME);
-        const snapshot = await getDocs(colRef);
+        const { data: rows, error } = await supabase
+            .from(TABLE_NAME)
+            .select('key, value')
+            .eq('user_id', user.uid);
+
+        if (error) throw error;
 
         let pulledCount = 0;
-        for (const docSnap of snapshot.docs) {
-            const key = docSnap.id;
-            const cloudData = docSnap.data();
-            
-            // 无条件覆盖本地
-            if (cloudData && cloudData.value !== undefined) {
+        for (const row of rows || []) {
+            const key = row.key;
+            const cloudValue = row.value;
+
+            if (cloudValue !== undefined && cloudValue !== null) {
                 // 数据完整性防御性日志
                 if (key.startsWith('author-settings-nodes')) {
-                    const nodes = cloudData.value;
-                    if (Array.isArray(nodes)) {
-                        const brokenItems = nodes.filter(n => n.type === 'item' && !n.parentId);
+                    if (Array.isArray(cloudValue)) {
+                        const brokenItems = cloudValue.filter(n => n.type === 'item' && !n.parentId);
                         if (brokenItems.length > 0) {
-                            console.warn(`[firestore] ⚠️ 发现 ${brokenItems.length} 个缺失 parentId 的游离设定条目:`, brokenItems.map(n => n.name));
+                            console.warn(`[supabase-sync] ⚠️ 发现 ${brokenItems.length} 个缺失 parentId 的游离设定条目:`, brokenItems.map(n => n.name));
                         }
-                    } else if (nodes === null || typeof nodes !== 'object') {
-                        console.warn(`[firestore] ⚠️ 异常的设定数据结构:`, nodes);
+                    } else if (cloudValue === null || typeof cloudValue !== 'object') {
+                        console.warn(`[supabase-sync] ⚠️ 异常的设定数据结构:`, cloudValue);
                     }
                 } else if (key.startsWith('author-chapters')) {
-                    if (!Array.isArray(cloudData.value) || cloudData.value.length === 0) {
-                         console.warn(`[firestore] ⚠️ 拉取到空章节数据:`, key);
+                    if (!Array.isArray(cloudValue) || cloudValue.length === 0) {
+                        console.warn(`[supabase-sync] ⚠️ 拉取到空章节数据:`, key);
                     }
                 }
 
-                await localSet(key, cloudData.value);
+                await localSet(key, cloudValue);
                 pulledCount++;
             }
         }
-        
-        console.log(`[firestore] force pulled ${snapshot.size} items, overwritten ${pulledCount} local items`);
+
+        console.log(`[supabase-sync] force pulled ${rows?.length ?? 0} items, overwritten ${pulledCount} local items`);
         notifySyncStatus({ syncing: false, pending: 0, lastSync: Date.now() });
         return pulledCount;
     } catch (err) {
-        console.error('[firestore] force pull failed:', err.message);
+        console.error('[supabase-sync] force pull failed:', err.message);
         notifySyncStatus({ syncing: false, pending: 0, error: err.message });
         throw err;
     }
@@ -428,6 +413,7 @@ export function stopSync() {
         _idleTimer = null;
     }
     _pendingWrites.clear();
+    _pendingDeletes.clear();
     _firstSyncAfterLogin = true; // 下次登录后重新强制首次同步
     notifySyncStatus({ pending: 0, syncing: false });
 }
@@ -438,10 +424,18 @@ export function stopSync() {
 export function setupBeforeUnloadSync() {
     if (typeof window === 'undefined') return;
     window.addEventListener('beforeunload', () => {
-        if (_pendingWrites.size > 0) {
-            // 使用 sendBeacon 或同步请求尝试最后一次同步
-            // 注意：这不可靠，但能提高数据安全性
+        if (_pendingWrites.size > 0 || _pendingDeletes.size > 0) {
             flushSync().catch(() => { });
         }
     });
 }
+
+// ==================== 兼容旧名称（别名导出）====================
+// 供仍使用旧名称的调用方过渡
+
+/** @deprecated 请使用 supabaseGet */
+export const firestoreGet = supabaseGet;
+/** @deprecated 请使用 supabaseEnqueue */
+export const firestoreEnqueue = supabaseEnqueue;
+/** @deprecated 请使用 supabaseDel */
+export const firestoreDel = supabaseDel;

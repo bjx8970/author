@@ -441,11 +441,11 @@
     "downloadClientDesc": "Built-in cloud sync, no extra configuration needed.",
     "quickDownload": "Quick Download (Windows)",
     "goToRelease": "Go to Release Page",
-    "configFirebase": "Configure Firebase Yourself",
+    "configFirebase": "Configure Supabase Yourself",
     "configFirebaseDesc": "Suitable for source code deployment / Vercel deployment users.",
     "viewGuide": "View Configuration Guide",
     "qqGroup": "Need help? Join QQ group 1087016949",
-    "notConfiguredCard": "Your deployment does not have Firebase configured, Cloud Sync is unavailable."
+    "notConfiguredCard": "Your deployment does not have Supabase configured, Cloud Sync is unavailable."
   },
   "tour": {
     "step1Title": "Create Your Story",

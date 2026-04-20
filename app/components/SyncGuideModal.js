@@ -85,7 +85,7 @@ export default function SyncGuideModal() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Settings size={18} style={{ color: 'var(--text-secondary)' }}/>
                             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-main)' }}>
-                                方式二：{t('cloudSync.configFirebase') || '自行配置 Firebase'}
+                                方式二：{t('cloudSync.configFirebase') || '自行配置 Supabase'}
                             </h3>
                         </div>
                         <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>

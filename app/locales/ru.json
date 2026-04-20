@@ -433,11 +433,11 @@
         "downloadClientDesc": "Встроенная облачная синхронизация, дополнительных настроек не требуется.",
         "quickDownload": "Быстрая загрузка (Windows)",
         "goToRelease": "Перейти на страницу релизов",
-        "configFirebase": "Настроить Firebase самостоятельно",
+        "configFirebase": "Настроить Supabase самостоятельно",
         "configFirebaseDesc": "Подходит для пользователей, развертывающих из исходного кода / через Vercel.",
         "viewGuide": "Посмотреть руководство по настройке",
         "qqGroup": "Нужна помощь? Присоединяйтесь к QQ группе 1087016949",
-        "notConfiguredCard": "В вашем развертывании не настроен Firebase, Cloud Sync недоступна."
+        "notConfiguredCard": "В вашем развертывании не настроен Supabase, Cloud Sync недоступна."
     },
     "tour": {
         "step1Title": "Создайте свою историю",

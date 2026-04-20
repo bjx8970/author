@@ -441,11 +441,11 @@
         "downloadClientDesc": "内置云同步，无需额外配置。",
         "quickDownload": "快速下载 (Windows)",
         "goToRelease": "前往 Release 页面",
-        "configFirebase": "自行配置 Firebase",
+        "configFirebase": "自行配置 Supabase",
         "configFirebaseDesc": "适合源码部署 / Vercel 部署用户。",
         "viewGuide": "查看配置指南",
         "qqGroup": "遇到问题？加入 QQ 群 1087016949",
-        "notConfiguredCard": "你的部署未配置 Firebase，无法使用云同步。"
+        "notConfiguredCard": "你的部署未配置 Supabase，无法使用云同步。"
     },
     "tour": {
         "step1Title": "创建你的故事",
