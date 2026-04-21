@@ -14,7 +14,9 @@
 
 services:
   author-app:
-    build: .
+    build:
+      context: .
+      network: host
     container_name: author-studio
     ports:
       - "${PORT:-3000}:3000"

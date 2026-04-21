@@ -8,13 +8,13 @@
 # ============================================
 
 # ---- 阶段1: 安装依赖 ----
-FROM node:20-alpine AS deps
+FROM node:22.13.0-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 # ---- 阶段2: 构建 ----
-FROM node:20-alpine AS builder
+FROM node:22.13.0-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
@@ -37,7 +37,7 @@ ENV NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID
 RUN npm run build
 
 # ---- 阶段3: 生产运行 ----
-FROM node:20-alpine AS runner
+FROM node:22.13.0-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
