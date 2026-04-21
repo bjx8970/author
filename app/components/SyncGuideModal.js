@@ -85,11 +85,11 @@ export default function SyncGuideModal() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Settings size={18} style={{ color: 'var(--text-secondary)' }}/>
                             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-main)' }}>
-                                方式二：{t('cloudSync.configFirebase') || '自行配置 Firebase'}
+                                方式二：{t('cloudSync.configSupabase') || '自行配置 Supabase'}
                             </h3>
                         </div>
                         <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                            {t('cloudSync.configFirebaseDesc') || '适合通过源码或 Vercel 进行私有化部署的极客用户。'}
+                            {t('cloudSync.configSupabaseDesc') || '适合通过源码或 Vercel 进行私有化部署的极客用户。配置 Supabase 项目后，设置 NEXT_PUBLIC_SUPABASE_URL 和 NEXT_PUBLIC_SUPABASE_ANON_KEY 即可。'}
                         </p>
                         <a 
                             href="https://github.com/YuanShiJiLoong/author#%E4%BA%91%E5%90%8C%E6%AD%A5%E9%85%8D%E7%BD%AE%E8%87%AA%E9%83%A8%E7%BD%B2%E7%94%A8%E6%88%B7" 

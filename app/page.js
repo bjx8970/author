@@ -204,7 +204,7 @@ export default function Home() {
   // 初始化数据
   useEffect(() => {
     const initData = async () => {
-      // 初始化 Firebase（如果已配置）
+      // 初始化 Supabase（如果已配置）
       await initPersistence();
 
       const workId = getActiveWorkId();
