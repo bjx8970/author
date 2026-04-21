@@ -24,15 +24,15 @@ export default function CloudSyncIndicator() {
         let unmounted = false;
         (async () => {
             try {
-                const { isFirebaseConfigured } = await import('../lib/firebase');
-                if (!isFirebaseConfigured || unmounted) return;
+                const { isSupabaseConfigured } = await import('../lib/supabase');
+                if (!isSupabaseConfigured || unmounted) return;
                 setFirebaseAvailable(true);
                 const { onAuthChange, initAuth } = await import('../lib/auth');
-                const { onSyncStatusChange } = await import('../lib/firestore-sync');
+                const { onSyncStatusChange } = await import('../lib/supabase-sync');
                 initAuth();
                 onAuthChange(user => { if (!unmounted) setAuthUser(user); });
                 onSyncStatusChange(status => { if (!unmounted) setSyncStatus(status); });
-            } catch { /* Firebase 未配置 */ }
+            } catch { /* Supabase 未配置 */ }
         })();
         return () => { unmounted = true; };
     }, []);

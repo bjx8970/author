@@ -1,17 +1,9 @@
 'use client';
 
-// ==================== Firebase Auth 封装 ====================
+// ==================== Supabase Auth 封装 ====================
 // 提供统一的认证接口，供 SettingsPanel 和 persistence 层使用
 
-import {
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    signInWithPopup,
-    GoogleAuthProvider,
-    signOut as firebaseSignOut,
-    onAuthStateChanged,
-} from 'firebase/auth';
-import { auth, isFirebaseConfigured } from './firebase';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 // ==================== 状态管理 ====================
 
@@ -20,16 +12,43 @@ const _listeners = new Set();
 
 // 初始化认证状态监听（应在应用启动时调用一次）
 export function initAuth() {
-    if (!isFirebaseConfigured || !auth) return;
+    if (!isSupabaseConfigured || !supabase) return;
 
-    onAuthStateChanged(auth, (user) => {
-        _currentUser = user;
-        // 记录登录过的账号到历史
-        if (user) saveAccountToHistory(user);
+    // 获取当前会话
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        const user = session?.user ?? null;
+        _currentUser = user ? _toUserProfile(user) : null;
+        if (_currentUser) saveAccountToHistory(_currentUser);
         _listeners.forEach(fn => {
-            try { fn(user); } catch (e) { console.error('[auth] listener error:', e); }
+            try { fn(_currentUser); } catch (e) { console.error('[auth] listener error:', e); }
         });
     });
+
+    // 监听后续变化
+    supabase.auth.onAuthStateChange((_event, session) => {
+        const user = session?.user ?? null;
+        _currentUser = user ? _toUserProfile(user) : null;
+        if (_currentUser) saveAccountToHistory(_currentUser);
+        _listeners.forEach(fn => {
+            try { fn(_currentUser); } catch (e) { console.error('[auth] listener error:', e); }
+        });
+    });
+}
+
+// 将 Supabase user 对象转换为统一格式
+function _toUserProfile(user) {
+    return {
+        uid: user.id,
+        id: user.id,
+        email: user.email || '',
+        displayName: user.user_metadata?.display_name || user.user_metadata?.full_name || '',
+        photoURL: user.user_metadata?.avatar_url || user.user_metadata?.photoURL || '',
+        providerData: [{ providerId: 'password' }],
+        metadata: {
+            creationTime: user.created_at,
+            lastSignInTime: user.last_sign_in_at,
+        },
+    };
 }
 
 // ==================== 账号历史 ====================
@@ -46,7 +65,7 @@ function saveAccountToHistory(user) {
             email: user.email || '',
             displayName: user.displayName || '',
             photoURL: user.photoURL || '',
-            provider: user.providerData?.[0]?.providerId || 'password',
+            provider: 'password',
             lastLogin: Date.now(),
         };
         if (existing >= 0) {
@@ -96,30 +115,26 @@ export function onAuthChange(callback) {
 
 // 邮箱 + 密码登录
 export async function signInWithEmail(email, password) {
-    if (!auth) throw new Error('Firebase 未配置');
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    return result.user;
+    if (!supabase) throw new Error('Supabase 未配置');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+    return _toUserProfile(data.user);
 }
 
 // 邮箱 + 密码注册
 export async function signUpWithEmail(email, password) {
-    if (!auth) throw new Error('Firebase 未配置');
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    return result.user;
-}
-
-// Google 登录
-export async function signInWithGoogle() {
-    if (!auth) throw new Error('Firebase 未配置');
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    return result.user;
+    if (!supabase) throw new Error('Supabase 未配置');
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error('注册成功，请检查邮箱完成验证');
+    return _toUserProfile(data.user);
 }
 
 // 退出登录
 export async function signOut() {
-    if (!auth) return;
-    await firebaseSignOut(auth);
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(error.message);
 }
 
 // ==================== 工具方法 ====================
@@ -137,16 +152,19 @@ export function getUserProfile() {
 
 // 更新用户个人资料（昵称 / 头像）
 export async function updateUserProfile({ displayName, photoURL }) {
-    if (!auth?.currentUser) throw new Error('未登录');
-    const { updateProfile } = await import('firebase/auth');
-    await updateProfile(auth.currentUser, { displayName, photoURL });
+    if (!supabase) throw new Error('未登录');
+    const updates = {};
+    if (displayName !== undefined) updates.display_name = displayName;
+    if (photoURL !== undefined) updates.photoURL = photoURL;
+    const { data, error } = await supabase.auth.updateUser({ data: updates });
+    if (error) throw new Error(error.message);
     // 刷新内部缓存
-    _currentUser = auth.currentUser;
+    _currentUser = _toUserProfile(data.user);
     _listeners.forEach(fn => { try { fn(_currentUser); } catch {} });
 }
 
 // 切换账号：先退出再打开登录弹窗
 export async function switchAccount() {
-    if (!auth) return;
-    await firebaseSignOut(auth);
+    if (!supabase) return;
+    await supabase.auth.signOut();
 }
