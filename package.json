@@ -35,7 +35,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "docx": "^9.6.0",
     "electron-updater": "^6.8.3",
-    "firebase": "^12.11.0",
+    "@supabase/supabase-js": "^2.49.4",
     "idb-keyval": "^6.2.2",
     "jszip": "^3.10.1",
     "katex": "^0.16.28",

@@ -92,41 +92,41 @@ async function serverDel(key) {
     }
 }
 
-// ==================== Firebase 同步 ====================
+// ==================== Supabase 同步 ====================
 
-let _firebaseReady = false;
-let _firestoreSync = null;
+let _supabaseReady = false;
+let _supabaseSync = null;
 let _authModule = null;
 
 /**
- * 懒加载 Firebase 模块（避免未配置时报错）
+ * 懒加载 Supabase 模块（避免未配置时报错）
  */
-async function ensureFirebase() {
-    if (_firebaseReady) return _firestoreSync;
+async function ensureSupabase() {
+    if (_supabaseReady) return _supabaseSync;
     try {
-        const { isFirebaseConfigured } = await import('./firebase');
-        if (!isFirebaseConfigured) {
-            _firebaseReady = true;
+        const { isSupabaseConfigured } = await import('./supabase');
+        if (!isSupabaseConfigured) {
+            _supabaseReady = true;
             return null;
         }
-        _firestoreSync = await import('./firestore-sync');
+        _supabaseSync = await import('./supabase-sync');
         _authModule = await import('./auth');
-        _firebaseReady = true;
-        return _firestoreSync;
+        _supabaseReady = true;
+        return _supabaseSync;
     } catch {
-        _firebaseReady = true;
+        _supabaseReady = true;
         return null;
     }
 }
 
-function isFirebaseSignedIn() {
+function isSupabaseSignedIn() {
     return _authModule?.isSignedIn?.() || false;
 }
 
 // ==================== 统一存储接口 ====================
 
 /**
- * 读取数据（本地优先，Firebase 已登录时作为补充）
+ * 读取数据（本地优先，Supabase 已登录时作为补充）
  * @param {string} key - 存储键名
  * @returns {Promise<any>} 存储的值，不存在时返回 undefined
  */
@@ -158,7 +158,7 @@ export async function persistGet(key) {
 }
 
 /**
- * 写入数据（本地实时 + Firebase 去抖同步）
+ * 写入数据（本地实时 + Supabase 去抖同步）
  * @param {string} key - 存储键名
  * @param {any} value - 要存储的值
  */
@@ -179,11 +179,11 @@ export async function persistSet(key, value) {
         });
     }
 
-    // 3. Firebase 云同步（去抖队列，5分钟批量写入）
+    // 3. Supabase 云同步（去抖队列，5分钟批量写入）
     if (isSyncableKey(key)) {
-        const sync = await ensureFirebase();
-        if (sync && isFirebaseSignedIn()) {
-            sync.firestoreEnqueue(key, value);
+        const sync = await ensureSupabase();
+        if (sync && isSupabaseSignedIn()) {
+            sync.supabaseEnqueue(key, value);
         }
     }
 }
@@ -201,11 +201,11 @@ export async function persistDel(key) {
         serverDel(key).catch(() => { });
     }
 
-    // Firebase 删除
+    // Supabase 删除
     if (isSyncableKey(key)) {
-        const sync = await ensureFirebase();
-        if (sync && isFirebaseSignedIn()) {
-            sync.firestoreDel(key).catch(() => { });
+        const sync = await ensureSupabase();
+        if (sync && isSupabaseSignedIn()) {
+            sync.supabaseDel(key).catch(() => { });
         }
     }
 }
@@ -280,7 +280,7 @@ export function persistGetSync(key) {
 }
 
 /**
- * 初始化：确保 userId 存在，触发服务端检测，初始化 Firebase Auth
+ * 初始化：确保 userId 存在，触发服务端检测，初始化 Supabase Auth
  * 应在应用启动时调用一次
  */
 export async function initPersistence() {
@@ -288,8 +288,8 @@ export async function initPersistence() {
     ensureUserId();
     await checkServerAvailable();
 
-    // 初始化 Firebase Auth（如果已配置）
-    const sync = await ensureFirebase();
+    // 初始化 Supabase Auth（如果已配置）
+    const sync = await ensureSupabase();
     if (sync && _authModule) {
         _authModule.initAuth();
         // 页面卸载前尝试同步
@@ -298,20 +298,20 @@ export async function initPersistence() {
 }
 
 /**
- * Firebase 登录后调用：从云端拉取数据合并到本地
+ * Supabase 登录后调用：从云端拉取数据合并到本地
  * @returns {Promise<number>} 合并的条数
  */
 export async function syncFromCloud() {
-    const sync = await ensureFirebase();
-    if (!sync || !isFirebaseSignedIn()) return 0;
+    const sync = await ensureSupabase();
+    if (!sync || !isSupabaseSignedIn()) return 0;
     return await sync.pullAllFromCloud(persistGet, persistSet);
 }
 
 /**
- * Firebase 退出登录前调用：同步剩余数据 + 停止同步
+ * Supabase 退出登录前调用：同步剩余数据 + 停止同步
  */
 export async function stopCloudSync() {
-    const sync = await ensureFirebase();
+    const sync = await ensureSupabase();
     if (!sync) return;
     await sync.flushSync(); // 先同步剩余
     sync.stopSync();        // 再停止

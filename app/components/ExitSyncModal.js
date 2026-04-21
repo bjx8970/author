@@ -35,7 +35,7 @@ export default function ExitSyncModal() {
         setIsSyncing(true);
         
         try {
-            const { flushSync } = await import('../lib/firestore-sync');
+            const { flushSync } = await import('../lib/supabase-sync');
             await flushSync();
         } catch (err) {
             console.error('Exit sync failed:', err);

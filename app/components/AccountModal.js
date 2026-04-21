@@ -34,10 +34,10 @@ export default function AccountModal() {
         let unmounted = false;
         (async () => {
             try {
-                const { isFirebaseConfigured } = await import('../lib/firebase');
-                if (!isFirebaseConfigured || unmounted) return;
+                const { isSupabaseConfigured } = await import('../lib/supabase');
+                if (!isSupabaseConfigured || unmounted) return;
                 const { onAuthChange, getAccountHistory } = await import('../lib/auth');
-                const { onSyncStatusChange } = await import('../lib/firestore-sync');
+                const { onSyncStatusChange } = await import('../lib/supabase-sync');
                 onAuthChange(user => {
                     if (!unmounted) {
                         setAuthUser(user);
@@ -145,7 +145,7 @@ export default function AccountModal() {
 
     const handleAddNewAccount = () => {
         // 不退出当前账号，直接打开登录窗
-        // 如果用户成功登录新账号，Firebase 会自动切换
+        // 如果用户成功登录新账号，Supabase 会自动切换
         // 如果用户取消，原账号状态保持不变
         setShowAccountModal(false);
         setTimeout(() => setShowLoginModal(true), 300);
@@ -159,7 +159,7 @@ export default function AccountModal() {
 
     const handleManualSync = async () => {
         try {
-            const { flushSync } = await import('../lib/firestore-sync');
+            const { flushSync } = await import('../lib/supabase-sync');
             await flushSync();
         } catch { }
     };
@@ -171,7 +171,7 @@ export default function AccountModal() {
     const lastSignIn = authUser.metadata?.lastSignInTime
         ? new Date(authUser.metadata.lastSignInTime).toLocaleDateString()
         : null;
-    const providerName = authUser.providerData?.[0]?.providerId === 'google.com' ? 'Google' : '邮箱密码';
+    const providerName = '邮箱密码';
 
     // 其他历史账号（排除当前）
     const otherAccounts = accountHistory.filter(a => a.uid !== authUser.uid);

@@ -1333,7 +1333,7 @@ function PreferencesForm() {
     const { language, setLanguage, visualTheme, setVisualTheme, sidebarPushMode, setSidebarPushMode, aiSidebarPushMode, setAiSidebarPushMode, setShowSyncGuideModal } = useAppStore();
     const { t } = useI18n();
 
-    // ---- Firebase 账户 ----
+    // ---- Supabase 账户 ----
     const [authUser, setAuthUser] = useState(null);
     const [authLoading, setAuthLoading] = useState(false);
     const [authError, setAuthError] = useState('');
@@ -1341,21 +1341,21 @@ function PreferencesForm() {
     const [authPassword, setAuthPassword] = useState('');
     const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
     const [syncStatus, setSyncStatus] = useState(null);
-    const [firebaseAvailable, setFirebaseAvailable] = useState(false);
+    const [supabaseAvailable, setSupabaseAvailable] = useState(false);
 
     useEffect(() => {
-        // 动态加载 Firebase 模块（避免未配置时报错）
+        // 动态加载 Supabase 模块（避免未配置时报错）
         (async () => {
             try {
-                const { isFirebaseConfigured } = await import('../lib/firebase');
-                if (!isFirebaseConfigured) return;
-                setFirebaseAvailable(true);
+                const { isSupabaseConfigured } = await import('../lib/supabase');
+                if (!isSupabaseConfigured) return;
+                setSupabaseAvailable(true);
                 const { onAuthChange, initAuth } = await import('../lib/auth');
-                const { onSyncStatusChange } = await import('../lib/firestore-sync');
+                const { onSyncStatusChange } = await import('../lib/supabase-sync');
                 initAuth();
                 onAuthChange(user => setAuthUser(user));
                 onSyncStatusChange(status => setSyncStatus(status));
-            } catch { /* Firebase 未配置，忽略 */ }
+            } catch { /* Supabase 未配置，忽略 */ }
         })();
     }, []);
 
@@ -1377,22 +1377,6 @@ function PreferencesForm() {
             }
         } catch (err) {
             setAuthError(err.message || '操作失败');
-        } finally {
-            setAuthLoading(false);
-        }
-    };
-
-    const handleGoogleAuth = async () => {
-        setAuthLoading(true);
-        setAuthError('');
-        try {
-            const auth = await import('../lib/auth');
-            await auth.signInWithGoogle();
-            const { syncFromCloud } = await import('../lib/persistence');
-            const merged = await syncFromCloud();
-            if (merged > 0) window.location.reload();
-        } catch (err) {
-            setAuthError(err.message || 'Google 登录失败');
         } finally {
             setAuthLoading(false);
         }
@@ -1462,7 +1446,7 @@ function PreferencesForm() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                     <Cloud size={16} style={{ color: 'var(--accent)' }} />
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>云同步</span>
-                    {firebaseAvailable && authUser && (
+                    {supabaseAvailable && authUser && (
                         <span style={{
                             fontSize: 11, padding: '2px 8px', borderRadius: 20,
                             background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontWeight: 500,
@@ -1474,8 +1458,8 @@ function PreferencesForm() {
                     )}
                 </div>
 
-                {!firebaseAvailable ? (
-                    /* 未配置 Firebase（本地离线模式） */
+                {!supabaseAvailable ? (
+                    /* 未配置 Supabase（本地离线模式） */
                     <div style={{
                         padding: '16px 20px', borderRadius: 'var(--radius-md)',
                         background: 'var(--bg-primary)', border: '1px solid var(--border-light)',
@@ -1624,30 +1608,6 @@ function PreferencesForm() {
                                     {authMode === 'login' ? '没有账号？注册' : '已有账号？登录'}
                                 </button>
                             </div>
-
-                            {/* 分隔线 */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0' }}>
-                                <div style={{ flex: 1, height: 1, background: 'var(--border-light)' }} />
-                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>或</span>
-                                <div style={{ flex: 1, height: 1, background: 'var(--border-light)' }} />
-                            </div>
-
-                            {/* Google 登录 */}
-                            <button
-                                onClick={handleGoogleAuth}
-                                disabled={authLoading}
-                                style={{
-                                    width: '100%', padding: '8px 16px', fontSize: 13, fontWeight: 500,
-                                    border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
-                                    background: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                    transition: 'all 0.15s',
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
-                                onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-primary)'}
-                            >
-                                <Globe2 size={15} /> 使用 Google 账号登录
-                            </button>
                         </div>
                     )}
                 </div>

@@ -134,7 +134,7 @@ function SyncMenuPortal({ anchorRef, cloudinarySyncStatus, setShowSyncMenu, setS
                         onClick={async () => {
                             setShowSyncMenu(false);
                             try {
-                                const { flushSync } = await import('../lib/firestore-sync');
+                                const { flushSync } = await import('../lib/supabase-sync');
                                 await flushSync();
                             } catch {}
                         }}
@@ -220,20 +220,20 @@ export default function Sidebar({ onOpenHelp, onToggle, editorRef, pushMode }) {
     // ---- 云同步状态（侧栏图标指示） ----
     const [cloudAuthUser, setCloudAuthUser] = useState(null);
     const [cloudSyncStatus, setCloudSyncStatus] = useState(null);
-    const [firebaseAvailable, setFirebaseAvailable] = useState(false);
+    const [supabaseAvailable, setSupabaseAvailable] = useState(false);
     useEffect(() => {
         let unmounted = false;
         (async () => {
             try {
-                const { isFirebaseConfigured } = await import('../lib/firebase');
-                if (!isFirebaseConfigured || unmounted) return;
-                setFirebaseAvailable(true);
+                const { isSupabaseConfigured } = await import('../lib/supabase');
+                if (!isSupabaseConfigured || unmounted) return;
+                setSupabaseAvailable(true);
                 const { onAuthChange, initAuth } = await import('../lib/auth');
-                const { onSyncStatusChange } = await import('../lib/firestore-sync');
+                const { onSyncStatusChange } = await import('../lib/supabase-sync');
                 initAuth();
                 onAuthChange(user => { if (!unmounted) setCloudAuthUser(user); });
                 onSyncStatusChange(status => { if (!unmounted) setCloudSyncStatus(status); });
-            } catch { /* Firebase 未配置 */ }
+            } catch { /* Supabase 未配置 */ }
         })();
         return () => { unmounted = true; };
     }, []);
@@ -846,11 +846,11 @@ export default function Sidebar({ onOpenHelp, onToggle, editorRef, pushMode }) {
                                         : cloudSyncStatus?.idle ? '自动同步已暂停'
                                         : cloudSyncStatus?.lastSync ? `已同步 · ${new Date(cloudSyncStatus.lastSync).toLocaleTimeString()}`
                                         : '云同步')
-                                    : (!firebaseAvailable && !(typeof window !== 'undefined' && window.electron) ? (t('settings.syncGuide') || '云同步指南') : '点击登录，开启云同步')}
+                                    : (!supabaseAvailable && !(typeof window !== 'undefined' && window.electron) ? (t('settings.syncGuide') || '云同步指南') : '点击登录，开启云同步')}
                                 text={sidebarOpen ? '同步' : undefined}
                                 tooltipSide="right"
                                 onClick={async () => {
-                                    if (!firebaseAvailable) {
+                                    if (!supabaseAvailable) {
                                         const isElectron = typeof window !== 'undefined' && window.electron;
                                         if (isElectron) {
                                             useAppStore.getState().setShowLoginModal(true);
@@ -1223,7 +1223,7 @@ export default function Sidebar({ onOpenHelp, onToggle, editorRef, pushMode }) {
                     onClose={() => setShowSyncConfirmModal(false)} 
                     onConfirm={async () => {
                         try {
-                            const { forcePullFromCloud } = await import('../lib/firestore-sync');
+                            const { forcePullFromCloud } = await import('../lib/supabase-sync');
                             const { persistSet } = await import('../lib/persistence');
                             
                             window._isAppForcePulling = true;
